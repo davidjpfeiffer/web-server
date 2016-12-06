@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -8,12 +6,9 @@ using System.Text;
 class Client
 {
     private static Socket ServerSocket;
-    private static List<string> Log;
 
     public static void Main(string[] args)
     {
-        Log = new List<string>();
-
         Console.WriteLine("You may type exit to quit at any time.");
 
         while (true)
@@ -34,7 +29,6 @@ class Client
     {
         ServerSocket.Shutdown(SocketShutdown.Both);
         ServerSocket.Close();
-        File.AppendAllLines("../../log.txt", Log);
     }
 
     private static void RequestResourceFromServer(string url)

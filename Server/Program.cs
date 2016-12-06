@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -10,45 +9,54 @@ namespace Server
     class Server
     {
         private static Socket ServerSocket;
-        private static List<string> Log;
-        private static uint DataSize = 1024;
 
         public static void Main(string[] args)
         {
             StartServer(args);
+            ServerSocket.BeginAccept(new AsyncCallback(AcceptCallback), ServerSocket);
+            while (true) { }
+        }
 
-            while (true)
+        public static void AcceptCallback(IAsyncResult asyncResult)
+        {
+            ServerSocket.BeginAccept(new AsyncCallback(AcceptCallback), ServerSocket);
+            Socket client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            try
             {
-                Log = new List<string>();
-                byte[] data = new byte[DataSize];
+                client = ServerSocket.EndAccept(asyncResult);
 
-                LogMessage("Waiting for a client...");
-                Socket client = ServerSocket.Accept();
-                LogMessage($@"Connected with {GetClientAddress(client)} at port {GetClientPort(client)}");
-
-                LogMessage("Waiting for request from client...");
-                Request request = GetRequestFromClient(client);
-                if (request == null) continue;
-                LogMessage($@"Received client request: {request}");
-
-                data = Encoding.ASCII.GetBytes(GetRequestedResource(request));
-                client.Send(data, SocketFlags.None);
-                LogMessage("Resource sent to client");
-
-                LogMessage(String.Format($@"Disconnecting from client {GetClientAddress(client)}"));
+                StateObject state = new StateObject();
+                state.client = client;
+                client.BeginReceive(state.buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
+            }
+            catch (Exception)
+            {
                 client.Close();
-
-                File.AppendAllLines("../../log.txt", Log);
             }
         }
 
-        private static Request GetRequestFromClient(Socket client)
+        public static void ReceiveCallback(IAsyncResult asyncResult)
         {
-            byte[] data = new byte[DataSize];
-            int dataLength = client.Receive(data);
+            StateObject state = (StateObject)asyncResult.AsyncState;
+            Socket client = state.client;
+            int bytesRead = client.EndReceive(asyncResult);
 
-            if (dataLength == 0) return null;
-            return new Request(Encoding.ASCII.GetString(data, 0, dataLength));
+            if (bytesRead > 0)
+            {
+                Request request = new Request(Encoding.ASCII.GetString(state.buffer, 0, bytesRead));
+                byte[] data = Encoding.ASCII.GetBytes(GetRequestedResource(request));
+
+                Console.WriteLine($@"Received client {GetClientAddress(client)} request: {request}");
+                client.BeginSend(data, 0, data.Length, SocketFlags.None, SendCallback, state);
+            }
+        }
+
+        public static void SendCallback(IAsyncResult asyncResult)
+        {
+            StateObject state = (StateObject)asyncResult.AsyncState;
+            Socket client = state.client;
+            client.Close();
         }
 
         private static void StartServer(string[] args)
@@ -64,11 +72,6 @@ namespace Server
         private static IPAddress GetClientAddress(Socket client)
         {
             return ((IPEndPoint)client.RemoteEndPoint).Address;
-        }
-
-        private static int GetClientPort(Socket client)
-        {
-            return ((IPEndPoint)client.RemoteEndPoint).Port;
         }
 
         private static string GetRequestedResource(Request request)
@@ -94,15 +97,6 @@ namespace Server
             }
 
             return File.ReadAllText(resourcePath);
-        }
-
-        private static void LogMessage(string message)
-        {
-            Console.WriteLine(message);
-            lock(Log)
-            {
-                Log.Add(message);
-            }
         }
     }
 }
