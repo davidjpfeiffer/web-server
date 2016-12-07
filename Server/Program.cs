@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -45,7 +46,7 @@ namespace Server
             if (bytesRead > 0)
             {
                 Request request = new Request(Encoding.ASCII.GetString(state.buffer, 0, bytesRead));
-                byte[] data = Encoding.ASCII.GetBytes(GetRequestedResource(request));
+                byte[] data = GetRequestedResource(request);
 
                 Console.WriteLine($@"Received client {GetClientAddress(client)} request: {request}");
                 client.BeginSend(data, 0, data.Length, SocketFlags.None, SendCallback, state);
@@ -74,29 +75,61 @@ namespace Server
             return ((IPEndPoint)client.RemoteEndPoint).Address;
         }
 
-        private static string GetRequestedResource(Request request)
+        private static byte[] GetRequestedResource(Request request)
         {
             string resourcePath;
+            bool found = true;
+            bool gif = false;
 
             switch (request.Url)
             {
                 case "/":
                 case "/index":
                 case "/index.html":
-                    resourcePath = "../../Pages/index.html";
+                    resourcePath = "../../Resources/index.html";
                     break;
 
                 case "/about":
                 case "/about.html":
-                    resourcePath = "../../Pages/about.html";
+                    resourcePath = "../../Resources/about.html";
+                    break;
+
+                case "/funny.gif":
+                    resourcePath = "../../Resources/funny.gif";
+                    gif = true;
                     break;
 
                 default:
-                    resourcePath = "../../Pages/404.html";
+                    resourcePath = "../../Resources/404.html";
+                    found = false;
                     break;
             }
 
-            return File.ReadAllText(resourcePath);
+            if (gif)
+            {
+                byte[] headers = Encoding.ASCII.GetBytes(GetHeaders(found, gif));
+                byte[] resource = File.ReadAllBytes(resourcePath);
+                return headers.Concat(resource).ToArray();
+            }
+            else
+            {
+                string headers = GetHeaders(found, gif);
+                string resource = File.ReadAllText(resourcePath);
+                return Encoding.ASCII.GetBytes(headers + resource);
+            }
+        }
+
+        private static string GetHeaders(bool found, bool gif)
+        {
+            string newLine = "\r\n";
+            string headers = string.Empty;
+
+            headers += found ? "HTTP/1.1 200 OK" : "HTTP/1.1 404 Not Found";
+            headers += newLine;
+            headers += gif ? "Content-type: image/gif" : "text/html";
+            headers += newLine + newLine;
+
+            return headers;
         }
     }
 }

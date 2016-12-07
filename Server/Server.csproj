@@ -53,9 +53,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Pages\about.html" />
-    <Content Include="Pages\index.html" />
-    <Content Include="Pages\404.html" />
+    <Content Include="Resources\about.html" />
+    <Content Include="Resources\funny.gif" />
+    <Content Include="Resources\index.html" />
+    <Content Include="Resources\404.html" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
