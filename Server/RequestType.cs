@@ -3,9 +3,9 @@
     enum RequestType
     {
         GET,
-        UPDATE,
-        POST,
         PUT,
+        POST,
+        UPDATE,
         DELETE,
         INVALID
     }
