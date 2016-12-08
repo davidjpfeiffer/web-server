@@ -6,56 +6,69 @@ namespace Server
 {
     class Request
     {
-        private readonly List<string> requestElements;
-
-        public Request(string httpRequest)
+        public Request(string rawHttpRequest)
         {
-            requestElements = httpRequest.Split(' ').ToList();
-
-            if (requestElements.Count < 2)
+            try
             {
-                throw new Exception("Invalid argument passed to Request constructor");
+                List<string> requestLines = rawHttpRequest
+                    .Replace('\r', ' ')
+                    .Trim()
+                    .Split('\n')
+                    .Select(i => i.Trim())
+                    .ToList();
+
+                string[] firstRequestLine = requestLines.First().Split(' ');
+                Type = GetRequestTypeFromString(firstRequestLine[0]);
+                Url = firstRequestLine[1];
+                Version = firstRequestLine[2];
+
+                requestLines.RemoveAt(0);
+
+                Headers = requestLines.ToDictionary(
+                    keySelector: i => i.Substring(0, i.IndexOf(':')),
+                    elementSelector: i => i.Substring(i.IndexOf(' ') + 1, i.Length - i.IndexOf(' ') - 1));
+            }
+            catch(Exception exception)
+            {
+                throw new Exception("Invalid argument passed to Request constructor", exception);
             }
         }
 
         public override string ToString()
         {
-            return $@"{RequestType} {Url}";
+            return $@"{Type} {Url} {Version}";
         }
 
-        public string Url
+        public Dictionary<string, string> Headers { get; private set; }
+
+        public string Url { get; private set; }
+
+        public RequestType Type { get; private set; }
+
+        public string Version { get; private set; }
+
+        private RequestType GetRequestTypeFromString(string requestType)
         {
-            get
+            switch (requestType)
             {
-                return requestElements[1];
-            }
-        }
+                case "GET":
+                    return RequestType.GET;
 
-        public RequestType RequestType
-        {
-            get
-            {
-                switch (requestElements[0])
-                {
-                    case "GET":
-                        return RequestType.GET;
+                case "UPDATE":
+                    return RequestType.UPDATE;
 
-                    case "UPDATE":
-                        return RequestType.UPDATE;
+                case "POST":
+                    return RequestType.POST;
 
-                    case "POST":
-                        return RequestType.POST;
+                case "PUT":
+                    return RequestType.PUT;
 
-                    case "PUT":
-                        return RequestType.PUT;
+                case "DELETE":
+                    return RequestType.DELETE;
 
-                    case "DELETE":
-                        return RequestType.DELETE;
+                default:
+                    return RequestType.INVALID;
 
-                    default:
-                        return RequestType.INVALID;
-
-                }
             }
         }
     }

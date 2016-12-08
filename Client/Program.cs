@@ -6,42 +6,69 @@ using System.Text;
 class Client
 {
     private static Socket ServerSocket;
+    private static bool Connected;
 
     public static void Main(string[] args)
     {
-        Console.WriteLine("You may type exit to quit at any time.");
+        ConnectToServer(args);
 
-        while (true)
+        if (Connected)
         {
-            Console.WriteLine("Enter the requested URL");
-            string message = Console.ReadLine();
+            Console.WriteLine("Successfully connected to server");
+            Console.WriteLine("Type exit to quit");
+        }
+
+        while (Connected)
+        {
+            Console.Write("Enter requested URL: ");
+            string message = Console.ReadLine().ToLower();
             if (message.Length == 0) continue;
             if (message == "exit") break;
 
-            ConnectToServer(args);
             RequestResourceFromServer(message);
             ReceiveResourceFromServer();
-            DisconnectFromServer();
         }
+
+        DisconnectFromServer();
     }
 
     private static void DisconnectFromServer()
     {
-        ServerSocket.Shutdown(SocketShutdown.Both);
-        ServerSocket.Close();
+        try
+        {
+            ServerSocket.Shutdown(SocketShutdown.Both);
+            ServerSocket.Close();
+            Connected = false;
+        }
+        catch { }
     }
 
     private static void RequestResourceFromServer(string url)
     {
-        ServerSocket.Send(Encoding.ASCII.GetBytes($@"GET {url}"));
+        try
+        {
+            ServerSocket.Send(Encoding.ASCII.GetBytes($@"GET {url} HTTP/1.1"));
+        }
+        catch(Exception)
+        {
+            Console.WriteLine("Unable to connect to server");
+            Connected = false;
+        }
     }
 
     private static void ReceiveResourceFromServer()
     {
-        byte[] data = new byte[1024];
-        int dataLength = ServerSocket.Receive(data);
-        string message = Encoding.ASCII.GetString(data, 0, dataLength);
-        Console.WriteLine(message);
+        try
+        {
+            byte[] data = new byte[1024];
+            int dataLength = ServerSocket.Receive(data);
+            string message = Encoding.ASCII.GetString(data, 0, dataLength);
+            Console.WriteLine(message);
+        }
+        catch(Exception)
+        {
+            Console.WriteLine("An error occured when requesting this resource");
+        }
     }
 
     private static string GetServerName(string[] args)
@@ -49,19 +76,37 @@ class Client
         return args.Length > 0 ? args[0] : "localhost";
     }
 
+    private static int GetPortNumber(string[] args)
+    {
+        return args.Length > 1 ? int.Parse(args[1]) : 8080;
+    }
+
     private static void ConnectToServer(string[] args)
     {
-        if (args.Length > 2) throw new ArgumentException("Parameters: <Server> <Port>");
+        try
+        {
+            if (args.Length > 2) throw new ArgumentException("Parameters: <Server> <Port>");
 
-        string serverName = args.Length > 0 ? args[0] : "localhost";
-        int portNumber = args.Length > 1 ? int.Parse(args[1]) : 8080;
+            string serverName = GetServerName(args);
+            int portNumber = GetPortNumber(args);
+            ServerSocket = GetDefaultSocket();
 
-        ServerSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            IPHostEntry ipHostEntry = Dns.GetHostEntry(serverName);
+            IPAddress ipAddress = ipHostEntry.AddressList[1];
+            IPEndPoint ipEndPoint = new IPEndPoint(ipAddress, portNumber);
 
-        IPHostEntry ipHostEntry = Dns.GetHostEntry(serverName);
-        IPAddress ipAddress = ipHostEntry.AddressList[1];
-        IPEndPoint ipEndPoint = new IPEndPoint(ipAddress, portNumber);
+            ServerSocket.Connect(ipEndPoint);
+            Connected = true;
+        }
+        catch(Exception)
+        {
+            Console.WriteLine("Unable to connect to server");
+            Connected = false;
+        }
+    }
 
-        ServerSocket.Connect(ipEndPoint);
+    private static Socket GetDefaultSocket()
+    {
+        return new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
     }
 }

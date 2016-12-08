@@ -15,20 +15,20 @@ namespace Server
         {
             StartServer(args);
             ServerSocket.BeginAccept(new AsyncCallback(AcceptCallback), ServerSocket);
+            Console.WriteLine("Waiting for requests...");
             while (true) { }
         }
 
         public static void AcceptCallback(IAsyncResult asyncResult)
         {
             ServerSocket.BeginAccept(new AsyncCallback(AcceptCallback), ServerSocket);
-            Socket client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            Socket client = GetDefaultSocket();
 
             try
             {
                 client = ServerSocket.EndAccept(asyncResult);
-
-                StateObject state = new StateObject();
-                state.client = client;
+                Console.WriteLine(string.Format("Connected with client {0}", GetClientAddress(client)));
+                StateObject state = new StateObject(client);
                 client.BeginReceive(state.buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
             }
             catch (Exception)
@@ -39,25 +39,38 @@ namespace Server
 
         public static void ReceiveCallback(IAsyncResult asyncResult)
         {
-            StateObject state = (StateObject)asyncResult.AsyncState;
+            StateObject state = GetState(asyncResult);
             Socket client = state.client;
-            int bytesRead = client.EndReceive(asyncResult);
 
-            if (bytesRead > 0)
+            try
             {
-                Request request = new Request(Encoding.ASCII.GetString(state.buffer, 0, bytesRead));
-                byte[] data = GetRequestedResource(request);
+                int bytesRead = client.EndReceive(asyncResult);
 
-                Console.WriteLine($@"Received client {GetClientAddress(client)} request: {request}");
-                client.BeginSend(data, 0, data.Length, SocketFlags.None, SendCallback, state);
+                if (bytesRead > 0)
+                {
+                    Request request = new Request(Encoding.ASCII.GetString(state.buffer, 0, bytesRead));
+                    byte[] data = GetRequestedResource(request);
+
+                    Console.WriteLine($@"Client {GetClientAddress(client)} requested: {request}");
+                    client.BeginSend(data, 0, data.Length, SocketFlags.None, new AsyncCallback(SendCallback), state);
+                }
+            }
+            catch(Exception)
+            {
+                Console.WriteLine(string.Format("Disconnected from client {0}", GetClientAddress(client)));
+                client.Close();
             }
         }
 
         public static void SendCallback(IAsyncResult asyncResult)
         {
-            StateObject state = (StateObject)asyncResult.AsyncState;
+            StateObject state = GetState(asyncResult);
             Socket client = state.client;
-            client.Close();
+
+            int bytesSent = client.EndSend(asyncResult);
+            Console.WriteLine(string.Format("Sent {0} bytes to client {1}", bytesSent, GetClientAddress(client)));
+            state = new StateObject(client);
+            client.BeginReceive(state.buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReceiveCallback), state);
         }
 
         private static void StartServer(string[] args)
@@ -65,14 +78,26 @@ namespace Server
             if (args.Length > 1) throw new ArgumentException("Parameters: [<Port>]");
 
             int portNumber = args.Length == 1 ? int.Parse(args[0]) : 8080;
-            ServerSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            ServerSocket = GetDefaultSocket();
             ServerSocket.Bind(new IPEndPoint(IPAddress.Any, portNumber));
             ServerSocket.Listen(10);
         }
 
-        private static IPAddress GetClientAddress(Socket client)
+        private static string GetClientAddress(Socket client)
         {
-            return ((IPEndPoint)client.RemoteEndPoint).Address;
+            IPEndPoint endPoint = (IPEndPoint)client.RemoteEndPoint;
+
+            return string.Format("{0}:{1}", endPoint.Address, endPoint.Port);
+        }
+
+        private static StateObject GetState(IAsyncResult asyncResult)
+        {
+            return (StateObject)asyncResult.AsyncState;
+        }
+
+        private static Socket GetDefaultSocket()
+        {
+            return new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         }
 
         private static byte[] GetRequestedResource(Request request)
@@ -81,7 +106,7 @@ namespace Server
             bool found = true;
             bool gif = false;
 
-            switch (request.Url)
+            switch (request.Url.ToLower())
             {
                 case "/":
                 case "/index":
@@ -105,28 +130,22 @@ namespace Server
                     break;
             }
 
-            if (gif)
-            {
-                byte[] headers = Encoding.ASCII.GetBytes(GetHeaders(found, gif));
-                byte[] resource = File.ReadAllBytes(resourcePath);
-                return headers.Concat(resource).ToArray();
-            }
-            else
-            {
-                string headers = GetHeaders(found, gif);
-                string resource = File.ReadAllText(resourcePath);
-                return Encoding.ASCII.GetBytes(headers + resource);
-            }
+            byte[] resource = gif ? File.ReadAllBytes(resourcePath) : Encoding.ASCII.GetBytes(File.ReadAllText(resourcePath));
+            byte[] headers = Encoding.ASCII.GetBytes(GetHeaders(resource.Length, found, gif));
+
+            return headers.Concat(resource).ToArray();
         }
 
-        private static string GetHeaders(bool found, bool gif)
+        private static string GetHeaders(int contentLength, bool found, bool gif)
         {
             string newLine = "\r\n";
             string headers = string.Empty;
 
             headers += found ? "HTTP/1.1 200 OK" : "HTTP/1.1 404 Not Found";
             headers += newLine;
-            headers += gif ? "Content-type: image/gif" : "text/html";
+            headers += gif ? "Content-type: image/gif" : "Content-type: text/html";
+            headers += newLine;
+            headers += string.Format("Content-Length: {0}", contentLength);
             headers += newLine + newLine;
 
             return headers;
