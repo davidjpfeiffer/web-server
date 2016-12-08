@@ -6,10 +6,8 @@ namespace Server
 {
     static class Controller
     {
-        public static byte[] HandleRequest(string rawHttpRequest)
+        public static Response HandleRequest(Request request)
         {
-            Request request = new Request(rawHttpRequest);
-
             switch (request.Type)
             {
                 case RequestType.GET:
@@ -32,7 +30,7 @@ namespace Server
             }
         }
 
-        private static byte[] Get(Request request)
+        private static Response Get(Request request)
         {
             Response response = new Response();
 
@@ -70,25 +68,25 @@ namespace Server
                     break;
             }
 
-            return response.ToByteArray();
+            return response;
         }
 
-        private static byte[] Put(Request request)
+        private static Response Put(Request request)
         {
             throw new NotImplementedException();
         }
 
-        private static byte[] Post(Request request)
+        private static Response Post(Request request)
         {
             throw new NotImplementedException();
         }
 
-        private static byte[] Update(Request request)
+        private static Response Update(Request request)
         {
             throw new NotImplementedException();
         }
 
-        private static byte[] Delete(Request request)
+        private static Response Delete(Request request)
         {
             throw new NotImplementedException();
         }

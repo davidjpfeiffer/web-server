@@ -36,7 +36,7 @@ namespace Server
 
         public override string ToString()
         {
-            return $@"{Type} {Url} {Version}";
+            return string.Format("{0} {1} {2}", Type, Url, Version);
         }
 
         public Dictionary<string, string> Headers { get; private set; }

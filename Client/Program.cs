@@ -47,7 +47,7 @@ class Client
     {
         try
         {
-            ServerSocket.Send(Encoding.ASCII.GetBytes($@"GET {url} HTTP/1.1"));
+            ServerSocket.Send(Encoding.ASCII.GetBytes(string.Format("GET {0} HTTP/1.1\r\n\r\n", url)));
         }
         catch(Exception)
         {
