@@ -43,10 +43,16 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BaseController.cs" />
+    <Compile Include="Controllers\NotFoundController.cs" />
+    <Compile Include="Controllers\AboutController.cs" />
+    <Compile Include="Controllers\HomeController.cs" />
+    <Compile Include="InvalidRequestException.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Request.cs" />
-    <Compile Include="Controller.cs" />
+    <Compile Include="RequestHandler.cs" />
+    <Compile Include="Routes.cs" />
     <Compile Include="StatusCode.cs" />
     <Compile Include="RequestType.cs" />
     <Compile Include="Response.cs" />
@@ -57,9 +63,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Resources\about.html" />
-    <Content Include="Resources\funny.gif" />
     <Content Include="Resources\index.html" />
-    <Content Include="Resources\404.html" />
+    <Content Include="Resources\not-found.html" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

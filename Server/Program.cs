@@ -49,7 +49,7 @@ namespace Server
                     string rawHttpRequest = Encoding.ASCII.GetString(state.buffer, 0, bytesRead);
                     Request request = new Request(rawHttpRequest);
                     Console.WriteLine(string.Format("Client {0} requested: {1}", GetClientAddress(client), request));
-                    Response response = Controller.HandleRequest(request);
+                    Response response = RequestHandler.HandleRequest(request);
                     byte[] responseData = response.ToByteArray();
                     client.BeginSend(responseData, 0, responseData.Length, SocketFlags.None, new AsyncCallback(SendCallback), state);
                 }
